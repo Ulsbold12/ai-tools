@@ -1,3 +1,8 @@
+"use client";
+
+import React, { useRef, useState } from "react";
+
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -6,90 +11,187 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 
+type OCRItem = { generated_text: string };
+type CaptionerFn = (image: string) => Promise<OCRItem[]>;
+
 export function TabsDemo() {
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+
+  const [result, setResult] = useState<string>("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [isModelLoading, setIsModelLoading] = useState(false);
+
+  const captionerRef = useRef<CaptionerFn | null>(null);
+
+  const handleGenerate = async () => {
+    if (!preview) return;
+
+    setIsLoading(true);
+    setResult("");
+
+    try {
+      if (!captionerRef.current) {
+        setIsModelLoading(true);
+
+        const { pipeline } = await import("@xenova/transformers");
+
+        const captioner = (await pipeline(
+          "image-to-text",
+          "Xenova/trocr-base-handwritten",
+        )) as unknown as CaptionerFn;
+
+        captionerRef.current = captioner;
+        setIsModelLoading(false);
+      }
+
+      const output = await captionerRef.current(preview);
+      console.log("MODEL OUTPUT:", output);
+
+      if (Array.isArray(output) && output.length > 0) {
+        const text = output
+          .map((x) => x?.generated_text ?? "")
+          .join(" ")
+          .trim();
+
+        setResult(text || "No text detected.");
+      } else {
+        setResult("No text detected.");
+      }
+    } catch (err) {
+      console.error(err);
+      setResult("Error while generating.");
+    } finally {
+      setIsLoading(false);
+      setIsModelLoading(false);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] ?? null;
+
+    if (!file || !file.type.startsWith("image/")) {
+      setSelectedFile(null);
+      setPreview(null);
+      setResult("");
+      return;
+    }
+
+    setSelectedFile(file);
+
+    const reader = new FileReader();
+    reader.onload = () => setPreview(reader.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  const removeFile = () => {
+    setSelectedFile(null);
+    setPreview(null);
+    setResult("");
+  };
+
+  const btnText = isModelLoading
+    ? "Loading model..."
+    : isLoading
+      ? "Generating..."
+      : "Generate";
+
   return (
-    <Tabs defaultValue="overview" className="w-145 mt-40">
+    <Tabs defaultValue="analysis" className="w-145 mt-40">
       <TabsList>
         <TabsTrigger value="analysis">Image analysis</TabsTrigger>
         <TabsTrigger value="recongnition">Ingredient recongnition</TabsTrigger>
         <TabsTrigger value="creator">Image creator</TabsTrigger>
       </TabsList>
+
       <TabsContent value="analysis">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                className="lucide lucide-sparkles-icon lucide-sparkles">
-                <path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z" />
-                <path d="M20 2v4" />
-                <path d="M22 4h-4" />
-                <circle cx="4" cy="20" r="2" />
-              </svg>
               Image analysis
             </CardTitle>
             <CardDescription>
-              Upload a food photo, and AI will detect the ingredient
+              Upload an image. (This OCR model reads text from images.)
             </CardDescription>
           </CardHeader>
+
           <CardContent className="text-muted-foreground text-sm">
-            <Input type="file" accept="image/*"></Input>
+            <div className="space-y-4">
+              {/* Upload row */}
+              <div className="flex items-center gap-4">
+                <Label
+                  htmlFor="file-upload"
+                  className="cursor-pointer text-sm font-medium">
+                  File
+                </Label>
+
+                <span className="text-sm text-muted-foreground">
+                  {selectedFile ? selectedFile.name : "JPG, PNG"}
+                </span>
+
+                <Input
+                  id="file-upload"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+              </div>
+
+              {/* Preview */}
+              {preview && (
+                <div className="space-y-2">
+                  <div className="w-64 h-64 overflow-hidden rounded-xl border">
+                    <img
+                      src={preview}
+                      alt="preview"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={removeFile}
+                    className="text-xs underline">
+                    Remove
+                  </button>
+                </div>
+              )}
+
+              {/* Generate button */}
+              <div className="flex justify-end">
+                <Button
+                  onClick={handleGenerate}
+                  disabled={!preview || isLoading || isModelLoading}>
+                  {(isLoading || isModelLoading) && (
+                    <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  )}
+                  {btnText}
+                </Button>
+              </div>
+
+              {/* Result */}
+              <div className="mt-4 space-y-2">
+                <div className="font-medium text-foreground">
+                  Here is the summary
+                </div>
+                <div className="text-muted-foreground">
+                  {result || "First, upload an image to recognize text."}
+                </div>
+              </div>
+            </div>
           </CardContent>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-3">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                className="lucide lucide-sticky-note-icon lucide-sticky-note">
-                <path d="M21 9a2.4 2.4 0 0 0-.706-1.706l-3.588-3.588A2.4 2.4 0 0 0 15 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2z" />
-                <path d="M15 3v5a1 1 0 0 0 1 1h5" />
-              </svg>
-              Here is the summary
-            </CardTitle>
-            <CardDescription>
-              First, enter your image to recognize an ingredients.
-            </CardDescription>
-          </CardHeader>
         </Card>
       </TabsContent>
+
       <TabsContent value="recongnition">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                className="lucide lucide-sparkles-icon lucide-sparkles">
-                <path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z" />
-                <path d="M20 2v4" />
-                <path d="M22 4h-4" />
-                <circle cx="4" cy="20" r="2" />
-              </svg>
               Ingredient recongnition
             </CardTitle>
             <CardDescription>
@@ -99,37 +201,15 @@ export function TabsDemo() {
           <CardContent className="text-muted-foreground text-sm">
             <Textarea className="w-133 h-31" />
           </CardContent>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-3">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                className="lucide lucide-sticky-note-icon lucide-sticky-note">
-                <path d="M21 9a2.4 2.4 0 0 0-.706-1.706l-3.588-3.588A2.4 2.4 0 0 0 15 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2z" />
-                <path d="M15 3v5a1 1 0 0 0 1 1h5" />
-              </svg>
-              Here is the summary
-            </CardTitle>
-            <CardDescription>
-              First, enter your image to recognize an ingredients.
-            </CardDescription>
-          </CardHeader>
         </Card>
       </TabsContent>
+
       <TabsContent value="creator">
         <Card>
           <CardHeader>
             <CardTitle>Reports</CardTitle>
             <CardDescription>
-              Generate and download your detailed reports. Export data in
-              multiple formats for analysis.
+              Generate and download your detailed reports.
             </CardDescription>
           </CardHeader>
           <CardContent className="text-muted-foreground text-sm">

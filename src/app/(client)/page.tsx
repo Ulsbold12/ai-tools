@@ -1,12 +1,14 @@
-import { BackgroundVideo } from "./_components/BackgroundVideo";
+import Hyperspeed from "@/components/Hyperspeed";
 import { TabsDemo } from "./_components/tabs";
 
 export default function Home() {
   return (
-    <div className="relative min-h-screen w-screen overflow-hidden">
-      <BackgroundVideo />
+    <div className="relative h-screen w-screen overflow-hidden bg-black">
+      <div className="absolute inset-0 z-0 pointer-events-none">
+        <Hyperspeed />
+      </div>
 
-      <div className="relative flex min-h-screen w-full  justify-center">
+      <div className="relative flex  justify-center ">
         <TabsDemo />
       </div>
     </div>
