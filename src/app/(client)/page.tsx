@@ -1,5 +1,6 @@
 import Hyperspeed from "@/components/Hyperspeed";
 import { TabsDemo } from "./_components/tabs";
+import ChatWidget from "./_components/ChatWidget";
 
 export default function Home() {
   return (
@@ -10,6 +11,9 @@ export default function Home() {
 
       <div className="relative flex  justify-center ">
         <TabsDemo />
+      </div>
+      <div className="relative flex  justify-end items-start">
+        <ChatWidget />
       </div>
     </div>
   );
