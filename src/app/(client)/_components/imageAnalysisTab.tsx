@@ -40,7 +40,7 @@ export function ImageAnalysisTab() {
 
         const captioner = (await pipeline(
           "image-to-text",
-          "Xenova/trocr-base-handwritten",
+          "Xenova/vit-gpt2-image-captioning",
         )) as unknown as CaptionerFn;
 
         captionerRef.current = captioner;
