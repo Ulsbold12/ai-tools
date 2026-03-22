@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenAI } from "@google/genai";
+import OpenAI from "openai";
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,23 +13,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
       return NextResponse.json(
-        { error: "GEMINI_API_KEY is not configured" },
+        { error: "OPENAI_API_KEY is not configured" },
         { status: 500 },
       );
     }
 
-    const ai = new GoogleGenAI({ apiKey });
+    const openai = new OpenAI({ apiKey });
 
-    const res = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
-      contents: `List all the ingredients needed to make "${description}". Format as a simple bullet list with amounts where relevant. Be concise.`,
+    const res = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "user",
+          content: `List all the ingredients needed to make "${description}". Format as a simple bullet list with amounts where relevant. Be concise.`,
+        },
+      ],
     });
 
     return NextResponse.json({
-      ingredients: res.text ?? "Could not detect ingredients.",
+      ingredients: res.choices[0]?.message?.content ?? "Could not detect ingredients.",
     });
   } catch (err) {
     console.error("Error in ingredients API:", err);

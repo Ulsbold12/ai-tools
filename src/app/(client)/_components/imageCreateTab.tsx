@@ -17,22 +17,33 @@ export function ImageCreatorTab() {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     if (!prompt.trim() || isLoading) return;
     setIsLoading(true);
     setImageUrl(null);
 
-    const encoded = encodeURIComponent(prompt.trim());
-    const url = `https://image.pollinations.ai/prompt/${encoded}?width=512&height=512&nologo=true&seed=${Date.now()}`;
-    setImageUrl(url);
+    try {
+      const response = await fetch("/api/image-create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: prompt.trim() }),
+      });
+
+      if (!response.ok) throw new Error("Failed to generate image");
+
+      const data = await response.json();
+      setImageUrl(data.imageUrl);
+    } catch {
+      alert("Failed to generate image. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleDownload = async () => {
     if (!imageUrl) return;
-    const res = await fetch(imageUrl);
-    const blob = await res.blob();
     const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
+    a.href = imageUrl;
     a.download = "generated-image.png";
     a.click();
   };
@@ -68,8 +79,6 @@ export function ImageCreatorTab() {
               src={imageUrl}
               alt="Generated"
               className="w-full rounded-xl border object-cover"
-              onLoad={() => setIsLoading(false)}
-              onError={() => setIsLoading(false)}
             />
             <div className="flex justify-end">
               <Button variant="outline" size="sm" onClick={handleDownload} disabled={isLoading}>

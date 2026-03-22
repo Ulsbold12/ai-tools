@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenAI } from "@google/genai";
+import OpenAI from "openai";
 
 type ChatMsg = {
   role: "user" | "assistant";
@@ -18,35 +18,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
       return NextResponse.json(
-        { error: "GEMINI_API_KEY is not configured" },
+        { error: "OPENAI_API_KEY is not configured" },
         { status: 500 },
       );
     }
 
-    const ai = new GoogleGenAI({ apiKey });
+    const openai = new OpenAI({ apiKey });
 
-    const history = messages.slice(0, -1).map((m) => ({
-      role: m.role === "assistant" ? "model" : "user",
-      parts: [{ text: m.content }],
-    }));
-
-    const last = messages[messages.length - 1];
-
-    const chat = ai.chats.create({
-      model: "gemini-2.0-flash", // эсвэл SDK дээр зөв model name-ээ тавь
-      history,
-      config: {
-        systemInstruction: "You are a helpful AI assistant.",
-      },
+    const res = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: "You are a helpful AI assistant." },
+        ...messages,
+      ],
     });
 
-    const res = await chat.sendMessage({ message: last.content });
-
     return NextResponse.json({
-      message: res.text ?? "Sorry, I couldn't generate a response.",
+      message: res.choices[0]?.message?.content ?? "Sorry, I couldn't generate a response.",
     });
   } catch (err) {
     console.error("Error in chat API:", err);
